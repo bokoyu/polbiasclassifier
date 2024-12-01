@@ -3,7 +3,6 @@ from torch.utils.data import Dataset
 from transformers import BertTokenizer, BertForSequenceClassification
 
 class MediaBiasDataset(Dataset):
-    """Custom Dataset class for Media Bias phrases."""
     def __init__(self, texts, labels, tokenizer, max_length=512):
         self.texts = texts.reset_index(drop=True)
         self.labels = labels.reset_index(drop=True)
@@ -32,11 +31,11 @@ class MediaBiasDataset(Dataset):
         }
 
 def create_model(num_labels=3):
-    """Load a pre-trained BERT model with a classification head."""
+    """load model"""
     model = BertForSequenceClassification.from_pretrained('bert-base-uncased', num_labels=num_labels)
     return model
 
 def create_tokenizer():
-    """Load the BERT tokenizer."""
+    """load tokenizer"""
     tokenizer = BertTokenizer.from_pretrained('bert-base-uncased')
     return tokenizer

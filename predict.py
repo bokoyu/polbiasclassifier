@@ -42,6 +42,6 @@ def predict_bias(text):
     return predicted_label
 
 if __name__ == "__main__":
-    sample_text = "Universities need affirmative action policies to promote diversity."
+    sample_text = "Universities need affirmative action policies to promote abortion rights."
     bias = predict_bias(sample_text)
     print(f"Predicted Bias: {bias}")

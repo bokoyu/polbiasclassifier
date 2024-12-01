@@ -8,27 +8,22 @@ import os
 import joblib
 
 def train_model():
-    # Load and preprocess data
     data = load_data(r'C:\Users\Borko\politicalbiasclassifier\data\phrasebias_data\combined_data\all_combined_dataset.csv')
     data, label_encoder = preprocess_data(data)
     train_texts, val_texts, train_labels, val_labels = split_data(data)
 
-    # Initialize tokenizer and datasets
     tokenizer = create_tokenizer()
     train_dataset = MediaBiasDataset(train_texts, train_labels, tokenizer)
     val_dataset = MediaBiasDataset(val_texts, val_labels, tokenizer)
 
-    # DataLoaders
     train_loader = DataLoader(train_dataset, batch_size=8, shuffle=True)
     val_loader = DataLoader(val_dataset, batch_size=8)
 
-    # Model and optimizer
     device = torch.device('cuda' if torch.cuda.is_available() else 'cpu')
     model = create_model()
     model = model.to(device)
     optimizer = AdamW(model.parameters(), lr=5e-5)
 
-    # Training loop
     epochs = 3
     for epoch in range(epochs):
         model.train()
@@ -55,7 +50,6 @@ def train_model():
         avg_loss = total_loss / len(train_loader)
         print(f"Epoch {epoch+1}/{epochs}, Loss: {avg_loss}")
 
-        # Validation loop
         model.eval()
         val_loss = 0
         with torch.no_grad():
@@ -74,14 +68,13 @@ def train_model():
         avg_val_loss = val_loss / len(val_loader)
         print(f"Epoch {epoch+1}/{epochs}, Validation Loss: {avg_val_loss}")
 
-    # Save the model and tokenizer
     save_directory = 'savedmodels/mediabias_bert_model'
     os.makedirs(save_directory, exist_ok=True)
     model.save_pretrained(save_directory)
     tokenizer.save_pretrained(save_directory)
 
-    # Save the label encoder
     joblib.dump(label_encoder, os.path.join(save_directory, 'label_encoder.joblib'))
 
 if __name__ == "__main__":
     train_model()
+
