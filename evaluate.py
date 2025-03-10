@@ -1,47 +1,98 @@
 import torch
 from torch.utils.data import DataLoader
-from data.data_loader import load_data, preprocess_data, split_data
-from models.bert_classifier import MediaBiasDataset, create_model, create_tokenizer
-from utils.metrics import compute_metrics
-import joblib
+from models.bert_classifier import MediaBiasDataset, create_tokenizer
 from transformers import BertForSequenceClassification
+from data.data_loader import load_data, preprocess_data, split_data
+from sklearn.metrics import accuracy_score, precision_score, recall_score, f1_score
 
-def evaluate_model():
-    data = load_data(r'C:\Users\Borko\politicalbiasclassifier\data\phrasebias_data\combined_data\all_combined_dataset.csv')
-    data, label_encoder = preprocess_data(data)
-    _, val_texts, _, val_labels = split_data(data)
+def evaluate_model(data_path, do_cleaning=False, cleaning_func=None, batch_size=8):
+    """
+    Evaluate both the Bias model and the Leaning model on the BABEv3 dataset.
+    """
+    df = load_data(data_path)
+    df = preprocess_data(df, do_cleaning=do_cleaning, cleaning_func=cleaning_func)
+
+    (X_train, X_val, y_train, y_val,
+     X_train_biased, X_val_biased, y_train_biased, y_val_biased) = split_data(df)
 
     tokenizer = create_tokenizer()
-    model = BertForSequenceClassification.from_pretrained('savedmodels/mediabias_bert_model')
-    model.eval()
 
-    label_encoder = joblib.load('savedmodels/mediabias_bert_model/label_encoder.joblib')
+    # Evaluate bias model
+    bias_model_path = 'savedmodels/bias_model'
+    bias_metrics = evaluate_bias_model(X_val, y_val, tokenizer, bias_model_path, batch_size)
+    print("==== BIAS MODEL EVALUATION ====")
+    print_metrics(bias_metrics)
 
-    val_dataset = MediaBiasDataset(val_texts, val_labels, tokenizer)
-    val_loader = DataLoader(val_dataset, batch_size=8)
+    # Evaluate leaning model
+    leaning_model_path = 'savedmodels/leaning_model'
+    leaning_metrics = evaluate_leaning_model(X_val_biased, y_val_biased, tokenizer, leaning_model_path, batch_size)
+    print("==== LEANING MODEL EVALUATION ====")
+    print_metrics(leaning_metrics)
+
+def evaluate_bias_model(X_val, y_val, tokenizer, model_path, batch_size=8):
+    dataset = MediaBiasDataset(X_val, y_val, tokenizer)
+    val_loader = DataLoader(dataset, batch_size=batch_size)
 
     device = torch.device('cuda' if torch.cuda.is_available() else 'cpu')
-    model = model.to(device)
+    model = BertForSequenceClassification.from_pretrained(model_path)
+    model.to(device)
+    model.eval()
 
-    predictions = []
-    true_labels = []
+    all_preds = []
+    all_labels = y_val.tolist()
 
     with torch.no_grad():
         for batch in val_loader:
             input_ids = batch['input_ids'].to(device)
             attention_mask = batch['attention_mask'].to(device)
             labels = batch['labels'].to(device)
-            outputs = model(
-                input_ids=input_ids,
-                attention_mask=attention_mask
-            )
+
+            outputs = model(input_ids=input_ids, attention_mask=attention_mask)
             logits = outputs.logits
             preds = torch.argmax(logits, dim=1)
-            predictions.extend(preds.cpu().numpy())
-            true_labels.extend(labels.cpu().numpy())
-            
+            all_preds.extend(preds.cpu().numpy())
 
-    compute_metrics(predictions, true_labels, label_encoder.classes_)
+    metrics = compute_classification_metrics(all_labels, all_preds)
+    return metrics
 
-if __name__ == "__main__":
-    evaluate_model()
+def evaluate_leaning_model(X_val, y_val, tokenizer, model_path, batch_size=8):
+    dataset = MediaBiasDataset(X_val, y_val, tokenizer)
+    val_loader = DataLoader(dataset, batch_size=batch_size)
+
+    device = torch.device('cuda' if torch.cuda.is_available() else 'cpu')
+    model = BertForSequenceClassification.from_pretrained(model_path)
+    model.to(device)
+    model.eval()
+
+    all_preds = []
+    all_labels = y_val.tolist()
+
+    with torch.no_grad():
+        for batch in val_loader:
+            input_ids = batch['input_ids'].to(device)
+            attention_mask = batch['attention_mask'].to(device)
+            outputs = model(input_ids=input_ids, attention_mask=attention_mask)
+            logits = outputs.logits
+            preds = torch.argmax(logits, dim=1)
+            all_preds.extend(preds.cpu().numpy())
+
+    metrics = compute_classification_metrics(all_labels, all_preds)
+    return metrics
+
+def compute_classification_metrics(true_labels, pred_labels):
+    acc = accuracy_score(true_labels, pred_labels)
+    prec = precision_score(true_labels, pred_labels, average='binary')
+    rec = recall_score(true_labels, pred_labels, average='binary')
+    f1 = f1_score(true_labels, pred_labels, average='binary')
+    return {
+        'accuracy': acc,
+        'precision': prec,
+        'recall': rec,
+        'f1': f1
+    }
+
+def print_metrics(metrics_dict):
+    for k, v in metrics_dict.items():
+        print(f"{k.capitalize()}: {v:.4f}")
+    print()
+

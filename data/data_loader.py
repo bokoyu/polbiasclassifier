@@ -1,26 +1,76 @@
 import pandas as pd
-from sklearn.preprocessing import LabelEncoder
 from sklearn.model_selection import train_test_split
+import os
+
+def map_type_to_leaning(label_val, type_val):
+    if pd.isnull(type_val):
+        type_val = 'null'
+
+    if label_val == 0 or type_val in ['null', 'center']:
+        return None 
+    elif type_val == 'left':
+        return 0
+    elif type_val == 'right':
+        return 1
+    else:
+        raise ValueError(f"Unrecognised combination: label={label_val}, type={type_val}")
 
 def load_data(file_path):
-    #load dataset
-    data = pd.read_csv(file_path)
+    if not os.path.exists(file_path):
+        raise FileNotFoundError(f"{file_path} does not exist.")
+    
+    if file_path.endswith('.parquet'):
+        df = pd.read_parquet(file_path)
+    else:
+        df = pd.read_csv(file_path)
 
-    if 'PHRASE' not in data.columns or 'calculated_bias' not in data.columns:
-        raise ValueError("Expected columns 'PHRASE' and 'calculated_bias' not found in dataset. Please check the column names.")
+    df = df[~((df['label'] == 1) & (df['type'] == 'null'))].copy()
 
-    data = data[['PHRASE', 'calculated_bias']]
-    return data
+    required_columns = ['text', 'label', 'type']
+    for col in required_columns:
+        if col not in df.columns:
+            raise ValueError(f"Missing required column: {col}")
 
-def preprocess_data(data):
-    label_encoder = LabelEncoder()
-    data['bias_label'] = label_encoder.fit_transform(data['calculated_bias'])
-    return data, label_encoder
-
-def split_data(data, test_size=0.2):
-    return train_test_split(
-        data['PHRASE'],
-        data['bias_label'],
-        test_size=test_size,
-        random_state=42
+    df['leaning'] = df.apply(
+        lambda row: map_type_to_leaning(row['label'], row['type']),
+        axis=1
     )
+
+    df.dropna(subset=['text', 'label'], inplace=True)
+    df.drop_duplicates(subset=['text'], inplace=True)
+
+    return df
+
+
+def preprocess_data(df, do_cleaning=False, cleaning_func=None):
+    if do_cleaning and cleaning_func is not None:
+        df['text'] = df['text'].astype(str).apply(cleaning_func)
+    
+    return df
+
+def split_data(df, test_size=0.2, random_state=42):
+    """
+    Splits the data for Step 1 (Bias vs. Neutral).
+    label=0 => Neutral, label=1 => Biased
+    We'll return train/test splits for step 1.
+    We'll also create a subset for step 2 training (only for label=1).
+    """
+    X = df['text']
+    y = df['label']  # Step 1 label
+
+    X_train, X_val, y_train, y_val = train_test_split(
+        X, y, test_size=test_size, random_state=random_state, stratify=y
+    )
+
+    # For step 2, we only take 'label=1' rows
+    df_biased = df[df['label'] == 1].copy()
+    df_biased = df_biased.dropna(subset=['leaning'])
+    X_biased = df_biased['text']
+    y_biased = df_biased['leaning']  # left=0, right=1
+
+    X_train_biased, X_val_biased, y_train_biased, y_val_biased = train_test_split(
+        X_biased, y_biased, test_size=test_size, random_state=random_state, stratify=y_biased
+    )
+
+    return (X_train, X_val, y_train, y_val,
+            X_train_biased, X_val_biased, y_train_biased, y_val_biased)
