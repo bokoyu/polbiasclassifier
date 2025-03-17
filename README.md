@@ -50,21 +50,6 @@ To predict the political bias of new text, use the `--text` argument:
 python main.py --mode predict --text "Your text here to predict bias"
 ```
 
-## Dataset
-The dataset should be a CSV file with the following columns:
-- **`PHRASE`**: The text or phrase to classify.
-- **`calculated_bias`**: The bias label, which can be "Left", "Right", or "Neutral".
-
-The script will preprocess the dataset, encode the labels, and split the data into training and validation sets.
-
-## Model Training
-The training script fine-tunes a BERT model using PyTorch. The model can be trained on a GPU for better performance. After training, the model, tokenizer, and label encoder are saved in the `savedmodels/mediabias_bert_model` directory.
-
-## Tips for Speeding Up Training
-- **Use a GPU**: Training BERT can be slow on a CPU. Using a GPU will significantly speed up training.
-- **Mixed Precision Training**: Consider using mixed precision to reduce memory usage and speed up training.
-- **Freeze Lower Layers**: You can freeze some of the BERT layers to speed up training.
-
 ## Authors
 This project was developed by Boris Petkov (bokoyu). Feel free to contribute or provide feedback.
 

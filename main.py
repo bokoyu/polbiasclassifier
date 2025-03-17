@@ -2,10 +2,11 @@ import argparse
 from train import train_model
 from evaluate import evaluate_model
 from predict import predict #change this
+from explain import kernel_shap_explain_bias, lime_explain_bias
 
 if __name__ == "__main__":
     parser = argparse.ArgumentParser(description="Political Bias Classification (2-Step)")
-    parser.add_argument('--mode', choices=['train', 'evaluate', 'predict'], required=True,
+    parser.add_argument('--mode', choices=['train', 'evaluate', 'predict', 'shap', 'lime'], required=True,
                         help="Mode to run the script.")
     parser.add_argument('--data', type=str, help="Path to the dataset (for train/evaluate).")
     parser.add_argument('--text', type=str, help="Text to predict bias for (predict mode).")
@@ -47,3 +48,30 @@ if __name__ == "__main__":
             final_prediction = predict(args.text)
             print(f"Final Prediction:\n{final_prediction}")
             
+
+    elif args.mode == 'shap':
+        if args.text:
+            print(f"Running SHAP on user text: {args.text}")
+            shap_values = kernel_shap_explain_bias([args.text])
+        else:
+            sample_texts = [
+                "This is a suspiciously liberal statement!",
+                "The left is misguided."
+            ]
+            print("No --text provided, using sample_texts.")
+            shap_values = kernel_shap_explain_bias(sample_texts)
+
+        print(shap_values)
+        print("Generated SHAP values.")
+
+    elif args.mode == 'lime':
+        if args.text:
+            print(f"Running LIME on user text: {args.text}")
+            exp = lime_explain_bias(args.text)
+        else:
+            # Default sample text
+            sample_text = "This is a suspiciously liberal statement!"
+            print(f"No --text provided, using default sample: '{sample_text}'")
+            exp = lime_explain_bias(sample_text)
+
+        print("LIME Weights:", exp.as_list())

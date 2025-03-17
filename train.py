@@ -1,41 +1,33 @@
-# train.py
-
 import os
 import torch
 from torch.utils.data import DataLoader
 from transformers import AdamW
 from tqdm import tqdm
-import joblib
 
 from data.data_loader import load_data, preprocess_data, split_data
 from models.bert_classifier import MediaBiasDataset, create_model, create_tokenizer
 
 def train_model(data_path, do_cleaning=False, cleaning_func=None, epochs=3, batch_size=8):
-    # 1) Load + preprocess
     df = load_data(data_path)
     df = preprocess_data(df, do_cleaning=do_cleaning, cleaning_func=cleaning_func)
 
-    # 2) Split
     (X_train, X_val, y_train, y_val,
      X_train_biased, X_val_biased, y_train_biased, y_val_biased) = split_data(df)
-
-    # 3) Create tokenizer
     tokenizer = create_tokenizer()
 
-    # 4) Train Step 1 model (bias vs. neutral)
     bias_model_path = 'savedmodels/bias_model'
     train_bias_model(
         X_train, y_train, X_val, y_val, tokenizer,
         bias_model_path, epochs=epochs, batch_size=batch_size
     )
 
-    # 5) Train Step 2 model (left vs. right)
+
     leaning_model_path = 'savedmodels/leaning_model'
     train_leaning_model(
         X_train_biased, y_train_biased, X_val_biased, y_val_biased, tokenizer,
         leaning_model_path, epochs=epochs, batch_size=batch_size
     )
-
+ 
 def train_bias_model(X_train, y_train, X_val, y_val, tokenizer,
                      save_path, epochs=3, batch_size=8):
 

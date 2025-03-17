@@ -30,7 +30,7 @@ class MediaBiasDataset(Dataset):
             'labels': torch.tensor(self.labels[idx], dtype=torch.long)
         }
 
-def create_model(num_labels=3):
+def create_model(num_labels=2):
     """load model"""
     model = BertForSequenceClassification.from_pretrained('bert-base-uncased', num_labels=num_labels)
     return model

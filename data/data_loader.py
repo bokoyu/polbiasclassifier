@@ -19,10 +19,9 @@ def load_data(file_path):
     if not os.path.exists(file_path):
         raise FileNotFoundError(f"{file_path} does not exist.")
     
-    if file_path.endswith('.parquet'):
-        df = pd.read_parquet(file_path)
-    else:
-        df = pd.read_csv(file_path)
+
+    df = pd.read_parquet(file_path)
+
 
     df = df[~((df['label'] == 1) & (df['type'] == 'null'))].copy()
 
@@ -52,8 +51,6 @@ def split_data(df, test_size=0.2, random_state=42):
     """
     Splits the data for Step 1 (Bias vs. Neutral).
     label=0 => Neutral, label=1 => Biased
-    We'll return train/test splits for step 1.
-    We'll also create a subset for step 2 training (only for label=1).
     """
     X = df['text']
     y = df['label']  # Step 1 label
