@@ -13,6 +13,7 @@ if __name__ == "__main__":
     parser.add_argument('--cleaning', action='store_true', help="Whether to apply cleaning.")
     parser.add_argument('--epochs', type=int, default=3, help="Number of training epochs.")
     parser.add_argument('--batch_size', type=int, default=8, help="Batch size for training.")
+    parser.add_argument('--overwrite', action='store_true', help="If set, overwrite existing model folder when training.")
 
     args = parser.parse_args()
 
@@ -25,7 +26,8 @@ if __name__ == "__main__":
                 do_cleaning=args.cleaning,
                 cleaning_func=None,
                 epochs=args.epochs,
-                batch_size=args.batch_size
+                batch_size=args.batch_size,
+                overwrite=args.overwrite
             )
 
     elif args.mode == 'evaluate':

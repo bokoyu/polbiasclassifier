@@ -3,11 +3,13 @@ import torch
 from torch.utils.data import DataLoader
 from transformers import AdamW
 from tqdm import tqdm
+import shutil
 
 from data.data_loader import load_data, preprocess_data, split_data
 from models.bert_classifier import MediaBiasDataset, create_model, create_tokenizer
 
-def train_model(data_path, do_cleaning=False, cleaning_func=None, epochs=3, batch_size=8):
+
+def train_model(data_path, do_cleaning=False, cleaning_func=None, epochs=3, batch_size=8, overwrite=False):
     df = load_data(data_path)
     df = preprocess_data(df, do_cleaning=do_cleaning, cleaning_func=cleaning_func)
 
@@ -16,13 +18,20 @@ def train_model(data_path, do_cleaning=False, cleaning_func=None, epochs=3, batc
     tokenizer = create_tokenizer()
 
     bias_model_path = 'savedmodels/bias_model'
+    leaning_model_path = 'savedmodels/leaning_model'
+
+
+    if overwrite and os.path.exists(bias_model_path):
+        shutil.rmtree(bias_model_path)
+    if overwrite and os.path.exists(leaning_model_path):
+        shutil.rmtree(leaning_model_path)
+
     train_bias_model(
         X_train, y_train, X_val, y_val, tokenizer,
         bias_model_path, epochs=epochs, batch_size=batch_size
     )
 
 
-    leaning_model_path = 'savedmodels/leaning_model'
     train_leaning_model(
         X_train_biased, y_train_biased, X_val_biased, y_val_biased, tokenizer,
         leaning_model_path, epochs=epochs, batch_size=batch_size
@@ -73,6 +82,7 @@ def train_bias_model(X_train, y_train, X_val, y_val, tokenizer,
 
     # Save
     os.makedirs(save_path, exist_ok=True)
+    print(f"Created directory (if needed) at {save_path}")
     model.save_pretrained(save_path)
     tokenizer.save_pretrained(save_path)
     print(f"Bias model saved to {save_path}")
@@ -87,7 +97,7 @@ def train_leaning_model(X_train, y_train, X_val, y_val, tokenizer,
     val_loader = DataLoader(val_dataset, batch_size=batch_size)
 
     device = torch.device('cuda' if torch.cuda.is_available() else 'cpu')
-    model = create_model(num_labels=2)  # 0=Left, 1=Right
+    model = create_model(num_labels=3)  # 0=Left, 1=Right, 2=center
     model.to(device)
 
     optimizer = AdamW(model.parameters(), lr=5e-5)
