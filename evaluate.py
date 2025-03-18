@@ -6,9 +6,7 @@ from data.data_loader import load_data, preprocess_data, split_data
 from sklearn.metrics import accuracy_score, precision_score, recall_score, f1_score
 
 def evaluate_model(data_path, do_cleaning=False, cleaning_func=None, batch_size=8):
-    """
-    Evaluate both the Bias model and the Leaning model on the BABEv3 dataset.
-    """
+
     df = load_data(data_path)
     df = preprocess_data(df, do_cleaning=do_cleaning, cleaning_func=cleaning_func)
 
