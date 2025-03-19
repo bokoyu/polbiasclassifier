@@ -4,6 +4,8 @@ from torch.utils.data import DataLoader
 from transformers import AdamW
 from tqdm import tqdm
 import shutil
+import torch.nn as nn
+import numpy as np
 
 from data.data_loader import load_data, preprocess_data, split_data
 from models.bert_classifier import MediaBiasDataset, create_model, create_tokenizer
@@ -11,6 +13,13 @@ from models.bert_classifier import MediaBiasDataset, create_model, create_tokeni
 
 def train_model(data_path, do_cleaning=False, cleaning_func=None, epochs=3, batch_size=8, overwrite=False):
     df = load_data(data_path)
+    print("===== Label Distribution =====")
+    print(df['label'].value_counts(dropna=False))
+
+    if 'type' in df.columns:
+        print("\n===== Type Distribution (Among Biased) =====")
+        print(df[df['label'] == 1]['type'].value_counts(dropna=False))
+
     df = preprocess_data(df, do_cleaning=do_cleaning, cleaning_func=cleaning_func)
 
     (X_train, X_val, y_train, y_val,
@@ -50,6 +59,19 @@ def train_bias_model(X_train, y_train, X_val, y_val, tokenizer,
     model = create_model(num_labels=2) 
     model.to(device)
 
+    # compute class weights
+
+    label_counts = np.bincount(y_train)
+    total = sum(label_counts)
+    class_weights = [total / c if c != 0 else 0.0 for c in label_counts]
+
+    print("Class counts (Bias Model): ", label_counts)
+    print("Class weights (Bias Model): ", class_weights)
+
+    class_weights_tensor = torch.tensor(class_weights, dtype=torch.float).to(device)
+    criterion = nn.CrossEntropyLoss(weight=class_weights_tensor)
+
+
     optimizer = AdamW(model.parameters(), lr=5e-5)
 
     for epoch in range(epochs):
@@ -64,9 +86,9 @@ def train_bias_model(X_train, y_train, X_val, y_val, tokenizer,
             labels = batch['labels'].to(device)
 
             outputs = model(input_ids=input_ids,
-                            attention_mask=attention_mask,
-                            labels=labels)
-            loss = outputs.loss
+                            attention_mask=attention_mask)
+            logits = outputs.logits
+            loss = criterion(logits, labels)
             total_loss += loss.item()
 
             loss.backward()
@@ -100,6 +122,17 @@ def train_leaning_model(X_train, y_train, X_val, y_val, tokenizer,
     model = create_model(num_labels=3)  # 0=Left, 1=Right, 2=center
     model.to(device)
 
+    label_counts = np.bincount(y_train)
+    total = sum(label_counts)
+    class_weights = [total / c if c != 0 else 0.0 for c in label_counts]
+
+    print("Class counts (Bias Model): ", label_counts)
+    print("Class weights (Bias Model): ", class_weights)
+
+    class_weights_tensor = torch.tensor(class_weights, dtype=torch.float).to(device)
+    criterion = nn.CrossEntropyLoss(weight=class_weights_tensor)
+
+
     optimizer = AdamW(model.parameters(), lr=5e-5)
 
     for epoch in range(epochs):
@@ -114,9 +147,9 @@ def train_leaning_model(X_train, y_train, X_val, y_val, tokenizer,
             labels = batch['labels'].to(device)
 
             outputs = model(input_ids=input_ids,
-                            attention_mask=attention_mask,
-                            labels=labels)
-            loss = outputs.loss
+                            attention_mask=attention_mask)
+            logits = outputs.logits
+            loss = criterion(logits, labels)
             total_loss += loss.item()
 
             loss.backward()
@@ -136,7 +169,7 @@ def train_leaning_model(X_train, y_train, X_val, y_val, tokenizer,
     tokenizer.save_pretrained(save_path)
     print(f"Leaning model saved to {save_path}")
 
-def evaluate_on_loader(model, data_loader, device):
+def evaluate_on_loader(model, data_loader, device, criterion):
     model.eval()
     total_loss = 0
     with torch.no_grad():
@@ -146,8 +179,9 @@ def evaluate_on_loader(model, data_loader, device):
             labels = batch['labels'].to(device)
 
             outputs = model(input_ids=input_ids,
-                            attention_mask=attention_mask,
-                            labels=labels)
-            total_loss += outputs.loss.item()
+                            attention_mask=attention_mask)
+            logits = outputs.logits
+            loss = criterion(logits, labels)
+            total_loss += loss.item()
 
     return total_loss / len(data_loader)

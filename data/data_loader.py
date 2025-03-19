@@ -41,7 +41,7 @@ def load_data(file_path):
     )
 
     df.dropna(subset=[text_column, 'label'], inplace=True)
-    df.drop_duplicates(subset=[text_column], inplace=True)
+    df.drop_duplicates(subset=[text_column, 'label', 'type'], inplace=True)
 
     df['final_text'] = df[text_column]
 

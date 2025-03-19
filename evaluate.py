@@ -79,9 +79,9 @@ def evaluate_leaning_model(X_val, y_val, tokenizer, model_path, batch_size=8):
 
 def compute_classification_metrics(true_labels, pred_labels):
     acc = accuracy_score(true_labels, pred_labels)
-    prec = precision_score(true_labels, pred_labels, average='binary')
-    rec = recall_score(true_labels, pred_labels, average='binary')
-    f1 = f1_score(true_labels, pred_labels, average='binary')
+    prec = precision_score(true_labels, pred_labels, average='macro')
+    rec = recall_score(true_labels, pred_labels, average='macro')
+    f1 = f1_score(true_labels, pred_labels, average='macro')
     return {
         'accuracy': acc,
         'precision': prec,
