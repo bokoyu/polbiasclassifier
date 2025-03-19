@@ -1,7 +1,7 @@
 import torch
 from torch.utils.data import DataLoader
 from models.bert_classifier import MediaBiasDataset, create_tokenizer
-from transformers import BertForSequenceClassification
+from transformers import RobertaForSequenceClassification
 from data.data_loader import load_data, preprocess_data, split_data
 from sklearn.metrics import accuracy_score, precision_score, recall_score, f1_score
 
@@ -32,7 +32,7 @@ def evaluate_bias_model(X_val, y_val, tokenizer, model_path, batch_size=8):
     val_loader = DataLoader(dataset, batch_size=batch_size)
 
     device = torch.device('cuda' if torch.cuda.is_available() else 'cpu')
-    model = BertForSequenceClassification.from_pretrained(model_path)
+    model = RobertaForSequenceClassification.from_pretrained(model_path)
     model.to(device)
     model.eval()
 
@@ -58,7 +58,7 @@ def evaluate_leaning_model(X_val, y_val, tokenizer, model_path, batch_size=8):
     val_loader = DataLoader(dataset, batch_size=batch_size)
 
     device = torch.device('cuda' if torch.cuda.is_available() else 'cpu')
-    model = BertForSequenceClassification.from_pretrained(model_path)
+    model = RobertaForSequenceClassification.from_pretrained(model_path)
     model.to(device)
     model.eval()
 

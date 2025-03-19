@@ -1,5 +1,5 @@
 import argparse
-from train import train_model
+from train import train_model, custom_clean
 from evaluate import evaluate_model
 from predict import predict #change this
 from explain import kernel_shap_explain_bias, lime_explain_bias
@@ -24,7 +24,7 @@ if __name__ == "__main__":
             train_model(
                 data_path=args.data,
                 do_cleaning=args.cleaning,
-                cleaning_func=None,
+                cleaning_func=custom_clean,
                 epochs=args.epochs,
                 batch_size=args.batch_size,
                 overwrite=args.overwrite

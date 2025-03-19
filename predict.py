@@ -1,5 +1,5 @@
 import torch
-from transformers import BertTokenizer, BertForSequenceClassification
+from transformers import RobertaTokenizer, RobertaForSequenceClassification
 import joblib
 
 BIAS_MODEL_PATH = "savedmodels/bias_model"
@@ -7,8 +7,8 @@ LEANING_MODEL_PATH = "savedmodels/leaning_model"
 
 def load_bias_components():
     """Load bias model components only when needed"""
-    tokenizer = BertTokenizer.from_pretrained(BIAS_MODEL_PATH)
-    model = BertForSequenceClassification.from_pretrained(BIAS_MODEL_PATH)
+    tokenizer = RobertaTokenizer.from_pretrained(BIAS_MODEL_PATH)
+    model = RobertaForSequenceClassification.from_pretrained(BIAS_MODEL_PATH)
     try:
         label_encoder = joblib.load(f"{BIAS_MODEL_PATH}/label_encoder.joblib")
     except FileNotFoundError:
@@ -21,8 +21,8 @@ def load_bias_components():
 
 def load_leaning_components():
     """Load leaning model components only when needed"""
-    tokenizer = BertTokenizer.from_pretrained(LEANING_MODEL_PATH)
-    model = BertForSequenceClassification.from_pretrained(LEANING_MODEL_PATH)
+    tokenizer = RobertaTokenizer.from_pretrained(LEANING_MODEL_PATH)
+    model = RobertaForSequenceClassification.from_pretrained(LEANING_MODEL_PATH)
     try:
         label_encoder = joblib.load(f"{LEANING_MODEL_PATH}/label_encoder.joblib")
     except FileNotFoundError:

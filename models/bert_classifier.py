@@ -1,6 +1,6 @@
 import torch
 from torch.utils.data import Dataset
-from transformers import BertTokenizer, BertForSequenceClassification
+from transformers import RobertaTokenizer, RobertaForSequenceClassification
 
 class MediaBiasDataset(Dataset):
     def __init__(self, texts, labels, tokenizer, max_length=512):
@@ -32,10 +32,10 @@ class MediaBiasDataset(Dataset):
 
 def create_model(num_labels=2):
     """load model"""
-    model = BertForSequenceClassification.from_pretrained('bert-base-uncased', num_labels=num_labels)
+    model = RobertaForSequenceClassification.from_pretrained('roberta-base', num_labels=num_labels)
     return model
 
 def create_tokenizer():
     """load tokenizer"""
-    tokenizer = BertTokenizer.from_pretrained('bert-base-uncased')
+    tokenizer = RobertaTokenizer.from_pretrained('roberta-base')
     return tokenizer
