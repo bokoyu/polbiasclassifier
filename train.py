@@ -8,21 +8,37 @@ import torch.nn as nn
 import numpy as np
 import re
 import contractions
-from deep_translator import GoogleTranslator
 import time
 import pandas as pd
+from functools import lru_cache
+from concurrent.futures import ThreadPoolExecutor
+from llm_augmentation import augment_with_t5
 
 from data.data_loader import load_data, preprocess_data, split_data
 from models.bert_classifier import MediaBiasDataset, create_model, create_tokenizer
 
+DEVICE = 0 if torch.cuda.is_available() else -1
+
 TRANSLATORS = {
     'fr': {
-        'en_to': pipeline('translation_en_to_fr', model='Helsinki-NLP/opus-mt-en-fr'),
-        'to_en': pipeline('translation_fr_to_en', model='Helsinki-NLP/opus-mt-fr-en')
+        'en_to': pipeline('translation_en_to_fr', 
+                         model='Helsinki-NLP/opus-mt-en-fr',
+                         device=DEVICE,
+                         torch_dtype=torch.float16 if DEVICE >=0 else torch.float32),
+        'to_en': pipeline('translation_fr_to_en',
+                         model='Helsinki-NLP/opus-mt-fr-en',
+                         device=DEVICE,
+                         torch_dtype=torch.float16 if DEVICE >=0 else torch.float32)
     },
     'de': {
-        'en_to': pipeline('translation_en_to_de', model='Helsinki-NLP/opus-mt-en-de'),
-        'to_en': pipeline('translation_de_to_en', model='Helsinki-NLP/opus-mt-de-en')
+        'en_to': pipeline('translation_en_to_de', 
+                         model='Helsinki-NLP/opus-mt-en-de',
+                         device=DEVICE,
+                         torch_dtype=torch.float16 if DEVICE >=0 else torch.float32),
+        'to_en': pipeline('translation_de_to_en',
+                         model='Helsinki-NLP/opus-mt-de-en',
+                         device=DEVICE,
+                         torch_dtype=torch.float16 if DEVICE >=0 else torch.float32)
     }
 }
 
@@ -33,38 +49,55 @@ def custom_clean(text):
     text = text.strip().lower()
     return text
 
-def back_translate(text: str, mid_lang: str = 'fr') -> str:
+@lru_cache(maxsize=5000)
+def back_translate(text: str, mid_lang: str) -> str:
     try:
-        translated = GoogleTranslator(source='en', target=mid_lang).translate(text)
-        back_translated = GoogleTranslator(source=mid_lang, target='en').translate(translated)
+        translated = TRANSLATORS[mid_lang]['en_to'](text, max_length=512)[0]['translation_text']
+        back_translated = TRANSLATORS[mid_lang]['to_en'](translated, max_length=512)[0]['translation_text']
         return back_translated
     except Exception as e:
-        print(f"Translation failed: {e}")
+        print(f"Translation failed for '{text[:50]}...': {e}")
         return text
 
-def augment_center_samples(df: pd.DataFrame, num_augments: int = 3) -> pd.DataFrame:
-    if 'type' not in df.columns:
-        return df
-        
-    center_samples = df[df['type'] == 'center'].copy()
-    if len(center_samples) == 0:
+def augment_center_samples(df: pd.DataFrame, num_augments: int = 2) -> pd.DataFrame:
+    if 'type' not in df.columns or df[df['type'] == 'center'].empty:
         return df
 
+    center_samples = df[df['type'] == 'center'].copy()
     augmented_rows = []
-    for _, row in center_samples.iterrows():
+
+    def process_row(row):
+        lang = np.random.choice(['fr', 'de'])
+        new_row = row.copy()
+        new_row['text'] = back_translate(row['text'], lang)
+        return new_row
+
+    with ThreadPoolExecutor(max_workers=8) as executor:
+        futures = []
         for _ in range(num_augments):
-            lang = np.random.choice(['fr', 'de', 'es', 'it'])
-            new_text = back_translate(row['text'], mid_lang=lang)
-            new_row = row.copy()
-            new_row['text'] = new_text
-            augmented_rows.append(new_row)
+            for _, row in center_samples.iterrows():
+                futures.append(executor.submit(process_row, row))
+        
+        # progress bar
+        for future in tqdm(futures, desc="Augmenting Center Samples", unit="text"):
+            augmented_rows.append(future.result())
 
     return pd.concat([df, pd.DataFrame(augmented_rows)], ignore_index=True)
 
-def train_model(data_path, do_cleaning=True, cleaning_func=custom_clean,
-                epochs=3, batch_size=8, overwrite=False):
+def train_model(
+    data_path,
+    do_cleaning=True,
+    cleaning_func=custom_clean,
+    epochs=3,
+    batch_size=8,
+    overwrite=False,
+    lr_bias=3e-5, 
+    lr_lean=2e-5    
+):
     df = load_data(data_path)
-    df = augment_center_samples(df, num_augments=3)
+    df = augment_with_t5(df, num_augments=1)
+    df = augment_center_samples(df, num_augments=2)
+
     print("===== Label Distribution =====")
     print(df['label'].value_counts(dropna=False))
 
@@ -74,8 +107,11 @@ def train_model(data_path, do_cleaning=True, cleaning_func=custom_clean,
 
     df = preprocess_data(df, do_cleaning=do_cleaning, cleaning_func=cleaning_func)
 
-    (X_train, X_val, y_train, y_val,
-     X_train_biased, X_val_biased, y_train_biased, y_val_biased) = split_data(df)
+    (
+        X_train, X_val, y_train, y_val,
+        X_train_biased, X_val_biased,
+        y_train_biased, y_val_biased
+    ) = split_data(df)
 
     tokenizer = create_tokenizer()
 
@@ -91,21 +127,27 @@ def train_model(data_path, do_cleaning=True, cleaning_func=custom_clean,
         X_train, y_train, X_val, y_val, tokenizer,
         save_path=bias_model_path,
         epochs=epochs,
-        batch_size=batch_size
+        batch_size=batch_size,
+        lr=lr_bias             
     )
 
     train_leaning_model(
         X_train_biased, y_train_biased, X_val_biased, y_val_biased, tokenizer,
         save_path=leaning_model_path,
         epochs=epochs,
-        batch_size=batch_size
+        batch_size=batch_size,
+        lr=lr_lean             
     )
+
 
 
 def train_bias_model(X_train, y_train, X_val, y_val, tokenizer,
                      save_path, epochs=3, batch_size=8,
-                     lr=3e-5, weight_decay=0.01,
+                     lr=None, weight_decay=0.01,
                      dropout_prob=0.3, patience=2):
+    
+    if lr is None:
+        lr = 3e-5
 
     train_dataset = MediaBiasDataset(X_train, y_train, tokenizer)
     val_dataset   = MediaBiasDataset(X_val,   y_val,   tokenizer)
@@ -205,19 +247,27 @@ def train_bias_model(X_train, y_train, X_val, y_val, tokenizer,
 
 def train_leaning_model(X_train, y_train, X_val, y_val, tokenizer,
                         save_path, epochs=3, batch_size=8,
-                        lr=2e-5, weight_decay=0.01,
+                        lr=None, weight_decay=0.01,
                         dropout_prob=0.3, patience=2):
 
     train_dataset = MediaBiasDataset(X_train, y_train, tokenizer)
     val_dataset   = MediaBiasDataset(X_val,   y_val,   tokenizer)
 
-    class_sample_counts = np.bincount(y_train)
-    weights = 1. / class_sample_counts
-    sample_weights = np.array([weights[label] for label in y_train])
+    if lr is None:
+        lr = 2e-5
+    # n_classes = 3
+    # y_train = y_train.astype(int)
+    # class_sample_counts = np.bincount(y_train, minlength=n_classes)
 
-    sampler = WeightedRandomSampler(sample_weights, num_samples=len(sample_weights), replacement=True)
+    # class_sample_counts = np.where(class_sample_counts == 0, 1, class_sample_counts)
 
-    train_loader = DataLoader(train_dataset, batch_size=batch_size, shuffle=True, sampler=sampler)
+
+    # weights = 1.0 / class_sample_counts
+    # sample_weights = np.array([weights[label] for label in y_train])
+
+    # sampler = WeightedRandomSampler(sample_weights, num_samples=len(sample_weights), replacement=True)
+
+    train_loader = DataLoader(train_dataset, batch_size=batch_size, shuffle=True)
     val_loader   = DataLoader(val_dataset,   batch_size=batch_size)
 
     device = torch.device('cuda' if torch.cuda.is_available() else 'cpu')
@@ -227,10 +277,11 @@ def train_leaning_model(X_train, y_train, X_val, y_val, tokenizer,
     model.config.attention_probs_dropout_prob = dropout_prob
     model.to(device)
 
-    total = sum(class_sample_counts)
-    class_weights = [total / c if c != 0 else 0.0 for c in class_sample_counts]
+    # total = sum(class_sample_counts)
+    # class_weights = [total / c if c != 0 else 0.0 for c in class_sample_counts]
 
-    print("Class counts (Leaning Model): ", class_sample_counts)
+    class_weights = [1.0, 1.0, 1.7]
+
     print("Class weights (Leaning Model): ", class_weights)
 
     class_weights_tensor = torch.tensor(class_weights, dtype=torch.float).to(device)
