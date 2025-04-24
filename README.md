@@ -103,22 +103,8 @@ Class imbalance is mitigated via:
 ### 5.2 Baseline
 A TF‑IDF + Logistic‑Regression pipeline (`tfidf.py`) offers interpretability and a sanity‑check.
 
----
 
-## 6 . Results (BABE test split)
-
-| Task | Model | Accuracy | Macro F1 |
-|------|-------|----------|----------|
-| Bias (Neutral / Biased) | TF‑IDF + LogReg | 0.74 | 0.73 |
-| Bias | RoBERTa (+T5 aug) | **0.88** | **0.88** |
-| Leaning (L/R/C) | TF‑IDF + LogReg | 0.62 | 0.53 |
-| Leaning | RoBERTa (+T5 aug) | **0.75** | **0.67** |
-
-Center recall improved from **0.22 → 0.58** after augmentation.
-
----
-
-## 7 . Re‑training on your own data
+## 6 . Re‑training on your own data
 
 1. Convert your corpus to **Parquet** with at least:
    * `text`   (raw article)
@@ -129,7 +115,7 @@ Center recall improved from **0.22 → 0.58** after augmentation.
 
 ---
 
-## 8 . Dependencies
+## 7 . Dependencies
 
 * **Python**: torch | transformers | scikit‑learn | pandas | flask | tqdm | contractions | joblib | shap | lime | imblearn
 * **Node / React**: React 18 | Chakra‑UI | React‑Router‑Dom | Vite
@@ -138,7 +124,7 @@ Exact pinned versions live in `requirements.txt` and `frontend/package.json`.
 
 ---
 
-## 9 . Known limitations & next steps
+## 8 . Known limitations & next steps
 
 * CPU inference is **slow** – deploy with a GPU for real‑time use.
 * Data comes largely from BABE (≈3 k sentences); domain shift to full articles may hurt accuracy.
@@ -147,9 +133,5 @@ Exact pinned versions live in `requirements.txt` and `frontend/package.json`.
 
 Feel free to open issues or PRs with suggestions!
 
----
-
-## 10 . License
-
-MIT © 2025 Theo Petkov & contributors
+2025 Theo Petkov & contributors
 
