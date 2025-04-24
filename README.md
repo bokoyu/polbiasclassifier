@@ -29,7 +29,6 @@
 │   └── src/pages/            # Home / Train / Evaluate views
 └── uploaded_data/            # temporary uploads accepted via `/uploadfile`
 ```
-*(See the full tree above for .git internals and caches.)*
 
 ---
 
