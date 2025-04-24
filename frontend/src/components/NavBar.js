@@ -1,21 +1,28 @@
-import React from 'react';
-import { Flex, Box, Link } from '@chakra-ui/react';
-import { Link as RouterLink } from 'react-router-dom';
+import { Flex, HStack, Link } from "@chakra-ui/react";
+import { NavLink } from "react-router-dom";
 
-function NavBar() {
+const links = [
+  { to: "/", label: "Home" },
+  { to: "/evaluate", label: "Evaluate" },
+  { to: "/train", label: "Train" },
+];
+
+export default function NavBar() {
   return (
-    <Flex bg="gray.100" p={4} mb={4} justify="flex-start" align="center">
-      <Box mr={6}>
-        <Link as={RouterLink} to="/">Home</Link>
-      </Box>
-      <Box mr={6}>
-        <Link as={RouterLink} to="/evaluate">Evaluate</Link>
-      </Box>
-      <Box mr={6}>
-        <Link as={RouterLink} to="/train">Train</Link>
-      </Box>
+    <Flex bg="white" shadow="sm" py={3} px={6}>
+      <HStack spacing={6}>
+        {links.map(({ to, label }) => (
+          <Link
+            key={to}
+            as={NavLink}
+            to={to}
+            fontWeight="medium"
+            _activeLink={{ color: "blue.500" }}
+          >
+            {label}
+          </Link>
+        ))}
+      </HStack>
     </Flex>
   );
 }
-
-export default NavBar;

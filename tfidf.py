@@ -10,7 +10,6 @@ from sklearn.metrics import classification_report, confusion_matrix
 from imblearn.over_sampling import SMOTE
 import argparse
 
-# === Data Loading and Preprocessing ===
 def load_data(filepath):
     """Load dataset from CSV or Parquet."""
     if not os.path.exists(filepath):
@@ -72,9 +71,8 @@ def preprocess_data(df, text_col='text', bias_col='label', leaning_col='type'):
     
     return df, df_biased, bias_encoder, leaning_encoder
 
-# === Model Training ===
+
 def train_bias_model(X_train, y_train, tfidf=None):
-    """Train TF-IDF + Logistic Regression for bias detection."""
     if tfidf is None:
         tfidf = TfidfVectorizer(max_features=5000, ngram_range=(1, 2))
         X_train_tfidf = tfidf.fit_transform(X_train)
@@ -85,7 +83,6 @@ def train_bias_model(X_train, y_train, tfidf=None):
     return clf, tfidf
 
 def train_leaning_model(X_train, y_train, tfidf=None):
-    """Train TF-IDF + Logistic Regression for leaning detection with SMOTE."""
     if tfidf is None:
         tfidf = TfidfVectorizer(max_features=5000, ngram_range=(1, 2))
         X_train_tfidf = tfidf.fit_transform(X_train)
@@ -97,9 +94,7 @@ def train_leaning_model(X_train, y_train, tfidf=None):
     clf.fit(X_train_tfidf_res, y_train_res)
     return clf, tfidf
 
-# === Evaluation ===
 def evaluate_model(clf, X_test_tfidf, y_test, label_encoder, model_name="Model"):
-    """Evaluate the model and print metrics."""
     y_pred = clf.predict(X_test_tfidf)
     print(f"\n=== {model_name} Evaluation on Test Set ===")
     print("Classification Report:")
@@ -113,7 +108,6 @@ def evaluate_model(clf, X_test_tfidf, y_test, label_encoder, model_name="Model")
 
 
 def predict(text, bias_clf, bias_tfidf, leaning_clf, leaning_tfidf, bias_encoder, leaning_encoder):
-    """Predict bias and leaning for a given text."""
     cleaned_text = clean_text(text)
     X_tfidf = bias_tfidf.transform([cleaned_text])
     

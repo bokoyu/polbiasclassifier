@@ -1,4 +1,4 @@
-from flask import Flask, request, jsonify
+from flask import Flask, request, jsonify, Response
 from predict import predict
 from train import train_model
 from evaluate import evaluate_model
@@ -6,15 +6,11 @@ import os
 
 app = Flask(__name__)
 
-UPLOAD_FOLDER = "uploaded_data"  # or "temp_data"
+UPLOAD_FOLDER = "uploaded_data"
 os.makedirs(UPLOAD_FOLDER, exist_ok=True)
-
+tasks = {}
 @app.route('/uploadfile', methods=['POST'])
 def upload_file():
-    """
-    Expects multipart/form-data with "data_file" as the name of the file field.
-    Saves the file to a server folder and returns its saved path.
-    """
     if 'data_file' not in request.files:
         return jsonify({"error": "No file part in request"}), 400
 
@@ -48,18 +44,15 @@ def predict_route():
 def train_route():
 
     data = request.get_json()
-    data_path = data.get("data_path")
     epochs = data.get("epochs", 3)
     cleaning = data.get("cleaning", False)
     batch_size = data.get("batch_size", 8)
     lr_bias = data.get("lr_bias", 3e-5)
     lr_lean = data.get("lr_lean", 2e-5)
 
-    if not data_path or not os.path.exists(data_path):
-        return jsonify({"error": f"Data file does not exist: {data_path}"}), 400
 
     train_model(
-        data_path=data_path,
+        data_path=None,
         do_cleaning=cleaning,
         epochs=epochs,
         batch_size=batch_size,
@@ -79,15 +72,10 @@ def evaluate_route():
     results = evaluate_model(
         data_path=data_path,
         do_cleaning=cleaning,
-        cleaning_func=None,  # or your custom cleaning function
+        cleaning_func=None,
         batch_size=8,
         verbose=False
     )
-    # results is now a dict:
-    # {
-    #   "bias_metrics": { ... },
-    #   "leaning_metrics": { ... }
-    # }
 
     return jsonify(results)
 

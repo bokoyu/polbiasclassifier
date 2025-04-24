@@ -18,6 +18,7 @@ from data.data_loader import load_data, preprocess_data, split_data
 from models.bert_classifier import MediaBiasDataset, create_model, create_tokenizer
 
 DEVICE = 0 if torch.cuda.is_available() else -1
+DEFAULT = "data/babe/train-00000-of-00001.parquet"
 
 TRANSLATORS = {
     'fr': {
@@ -85,7 +86,7 @@ def augment_center_samples(df: pd.DataFrame, num_augments: int = 2) -> pd.DataFr
     return pd.concat([df, pd.DataFrame(augmented_rows)], ignore_index=True)
 
 def train_model(
-    data_path,
+    data_path: str | None=None,
     do_cleaning=True,
     cleaning_func=custom_clean,
     epochs=3,
@@ -94,7 +95,7 @@ def train_model(
     lr_bias=3e-5, 
     lr_lean=2e-5    
 ):
-    df = load_data(data_path)
+    df = load_data(data_path or DEFAULT)
     df = augment_with_t5(df, num_augments=1)
     df = augment_center_samples(df, num_augments=2)
 

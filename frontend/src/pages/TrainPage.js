@@ -1,81 +1,86 @@
-// src/pages/TrainPage.js
-import React, { useState } from 'react';
+import React, { useState, useRef, useEffect } from "react";
 import {
-  Box,
   Heading,
-  Input,
   NumberInput,
   NumberInputField,
   Button,
   Switch,
   FormControl,
   FormLabel,
+  useToast,
+  Progress,
   Text,
-  useToast
-} from '@chakra-ui/react';
+} from "@chakra-ui/react";
 
-function TrainPage() {
-  const [dataPath, setDataPath] = useState("");
+import PageCard from "../components/PageCard";
+import ErrorAlert from "../components/ErrorAlert";
+
+export default function TrainPage() {
+  const toast = useToast();
+
+  // ─── form state ──────────────────────────────────────────────
   const [epochs, setEpochs] = useState(3);
   const [batchSize, setBatchSize] = useState(8);
   const [lrLean, setLrLean] = useState(3e-5);
   const [lrBias, setLrBias] = useState(3e-5);
   const [cleaning, setCleaning] = useState(false);
-  const [message, setMessage] = useState(null);
 
-  const toast = useToast();
+  // ─── ui state ────────────────────────────────────────────────
+  const [message, setMessage] = useState(null);
+  const [error, setError] = useState(null);
+  const [loading, setLoading] = useState(false);
+  const [elapsed, setElapsed] = useState(0);
+  const timerRef = useRef(null);
+
+  const fmt = (secs) => new Date(secs * 1000).toISOString().substring(14, 19);
 
   const handleTrain = async () => {
     setMessage(null);
+    setError(null);
+    setLoading(true);
+    setElapsed(0);
+
+    timerRef.current && clearInterval(timerRef.current);
+    timerRef.current = setInterval(() => setElapsed((s) => s + 1), 1000);
 
     try {
-      const response = await fetch('/train', {
-        method: 'POST',
-        headers: { 'Content-Type': 'application/json' },
+      const res = await fetch("/train", {
+        method: "POST",
+        headers: { "Content-Type": "application/json" },
         body: JSON.stringify({
-          data_path: dataPath,
-          epochs: parseInt(epochs),
-          batch_size: parseInt(batchSize),
-          lr_bias: parseFloat(lrBias),
-          lr_lean: parseFloat(lrLean),
+          epochs: Number(epochs),
+          batch_size: Number(batchSize),
+          lr_bias: Number(lrBias),
+          lr_lean: Number(lrLean),
           cleaning,
         }),
       });
-      if (!response.ok) {
-        const msg = await response.json();
-        throw new Error(msg.error || 'Request failed');
+
+      if (!res.ok) {
+        const msg = await res.json().catch(() => ({}));
+        throw new Error(msg.error || `Request failed with ${res.status}`);
       }
-      const data = await response.json();
+
+      const data = await res.json();
       setMessage(data.message);
+      toast({ title: "Training started", description: data.message, status: "success" });
     } catch (err) {
-      toast({
-        title: 'Error',
-        description: err.message,
-        status: 'error',
-        duration: 5000,
-        isClosable: true,
-      });
+      setError(err.message);
+      toast({ title: "Error", description: err.message, status: "error" });
+    } finally {
+      timerRef.current && clearInterval(timerRef.current);
+      timerRef.current = null;
+      setLoading(false);
     }
   };
 
-  return (
-    <Box
-      maxW="600px"
-      mx="auto"
-      mt="5rem"
-      p={4}
-      bg="white"
-      borderRadius="md"
-      boxShadow="md"
-    >
-      <Heading as="h2" size="lg" mb={4}>Train Models</Heading>
+  useEffect(() => () => timerRef.current && clearInterval(timerRef.current), []);
 
-      <Input
-        placeholder="Path to data file"
-        mb={4}
-        value={dataPath}
-        onChange={(e) => setDataPath(e.target.value)}
-      />
+  return (
+    <PageCard>
+      <Heading size="md" mb={6} textAlign="center">
+        Train Models
+      </Heading>
 
       <FormControl mb={4}>
         <FormLabel>Epochs</FormLabel>
@@ -90,52 +95,41 @@ function TrainPage() {
           <NumberInputField />
         </NumberInput>
       </FormControl>
-      {/* LEANING LR */}
+
       <FormControl mb={4}>
         <FormLabel>Learning Rate (Leaning Model)</FormLabel>
-        <NumberInput
-          min={1e-8}
-          step={1e-5}
-          value={lrLean}
-          onChange={(val) => setLrLean(val)}
-        >
+        <NumberInput min={1e-8} step={1e-5} value={lrLean} onChange={(val) => setLrLean(val)}>
           <NumberInputField />
         </NumberInput>
       </FormControl>
 
-      {/* BIAS LR */}
       <FormControl mb={4}>
         <FormLabel>Learning Rate (Bias Model)</FormLabel>
-        <NumberInput
-          min={1e-8}
-          step={1e-5}
-          value={lrBias}
-          onChange={(val) => setLrBias(val)}
-        >
+        <NumberInput min={1e-8} step={1e-5} value={lrBias} onChange={(val) => setLrBias(val)}>
           <NumberInputField />
         </NumberInput>
       </FormControl>
 
-      <FormControl display="flex" alignItems="center" mb={4}>
-        <FormLabel mb="0">Cleaning</FormLabel>
-        <Switch
-          isChecked={cleaning}
-          onChange={(e) => setCleaning(e.target.checked)}
-          colorScheme="blue"
-        />
+      <FormControl display="flex" alignItems="center" mb={6} justifyContent="center">
+        <FormLabel mb={0}>Cleaning</FormLabel>
+        <Switch isChecked={cleaning} onChange={(e) => setCleaning(e.target.checked)} colorScheme="blue" />
       </FormControl>
 
-      <Button colorScheme="blue" onClick={handleTrain}>
+      <Button colorScheme="blue" onClick={handleTrain} isLoading={loading} mx="auto" display="block">
         Train
       </Button>
 
-      {message && (
-        <Text color="green.600" mt={4}>
-          {message}
-        </Text>
+      {loading && (
+        <>
+          <Progress mt={6} isIndeterminate size="sm" borderRadius="full" />
+          <Text mt={2} fontSize="sm" color="gray.600" textAlign="center">
+            Training… elapsed {fmt(elapsed)}
+          </Text>
+        </>
       )}
-    </Box>
+
+      {error && <ErrorAlert message={error} />}
+      {message && !error && !loading && <ErrorAlert message={message} status="success" />}
+    </PageCard>
   );
 }
-
-export default TrainPage;

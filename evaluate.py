@@ -10,6 +10,8 @@ from sklearn.metrics import (
     f1_score
 )
 
+DEFAULT = "data/babe/test-00000-of-00001.parquet"
+
 def evaluate_model(
     data_path,
     do_cleaning=False,
@@ -18,7 +20,7 @@ def evaluate_model(
     verbose=True
 ):
 
-    df = load_data(data_path)
+    df = load_data(data_path or DEFAULT)
     df = preprocess_data(df, do_cleaning=do_cleaning, cleaning_func=cleaning_func)
 
     (
